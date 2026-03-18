@@ -36,15 +36,30 @@ public class SpriteRegionEditorToolEditor : Editor
 
         if (GUILayout.Button("Detect Regions"))
         {
-            // Record state for Undo and Dirty marking
             Undo.RecordObject(tool, "Detect Regions");
             tool.DetectRegions();
             EditorUtility.SetDirty(tool);
         }
         
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Refresh Preview"))
+        {
+            tool.GeneratePreview();
+        }
+        
+        if (GUILayout.Button("Sync Colors with Library"))
+        {
+            Undo.RecordObject(tool, "Sync Colors with Library");
+            tool.RefreshColorsFromLibrary();
+            EditorUtility.SetDirty(tool);
+        }
+        EditorGUILayout.EndHorizontal();
+        
         // Add button to detect border regions separately
         if (tool.detectBorderRegions)
         {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Border Management", EditorStyles.boldLabel);
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Detect Border Regions"))
             {
@@ -56,11 +71,6 @@ public class SpriteRegionEditorToolEditor : Editor
             if (GUILayout.Button("Save Border Colors"))
             {
                 tool.SaveBorderColors();
-            }
-            
-            if (GUILayout.Button("Force Border Colors"))
-            {
-                tool.ForceBorderColors();
             }
             EditorGUILayout.EndHorizontal();
         }

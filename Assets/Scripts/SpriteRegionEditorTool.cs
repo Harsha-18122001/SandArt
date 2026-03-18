@@ -223,9 +223,24 @@ private List<string> GetFairColorDistribution(int regionCount)
 
     public void GeneratePreview()
     {
-        if (sourceTexture == null) return;
+        if (sourceSprite == null) return;
+        
+        // Ensure texture data is initialized
+        if (sourceTexture == null || sourcePixels == null || width == 0 || height == 0)
+        {
+            sourceTexture = sourceSprite.texture;
+            if (sourceTexture == null) return;
+            
+            width = sourceTexture.width;
+            height = sourceTexture.height;
+            sourcePixels = sourceTexture.GetPixels();
+        }
 
-        previewTexture = new Texture2D(width, height);
+        if (previewTexture == null || previewTexture.width != width || previewTexture.height != height)
+        {
+            previewTexture = new Texture2D(width, height);
+            previewTexture.hideFlags = HideFlags.HideAndDontSave;
+        }
         Color[] previewPixels = new Color[width * height];
 
         // Start with black
@@ -273,10 +288,45 @@ private List<string> GetFairColorDistribution(int regionCount)
         if (renderer == null)
             renderer = gameObject.AddComponent<SpriteRenderer>();
 
-        renderer.sprite = Sprite.Create(previewTexture,
-                                        new Rect(0, 0, width, height),
-                                        new Vector2(0.5f, 0.5f),
-                                        sourceSprite.pixelsPerUnit);
+        // Reuse existing sprite if possible to avoid memory leak in editor
+        if (renderer.sprite != null && renderer.sprite.texture == previewTexture)
+        {
+            // Sprite already points to this texture, just need to update
+        }
+        else
+        {
+            renderer.sprite = Sprite.Create(previewTexture,
+                                            new Rect(0, 0, width, height),
+                                            new Vector2(0.5f, 0.5f),
+                                            sourceSprite.pixelsPerUnit);
+        }
+    }
+    
+    public void RefreshColorsFromLibrary()
+    {
+        if (colorLibrary == null) return;
+        
+        bool changed = false;
+        foreach (var region in regions)
+        {
+            if (!string.IsNullOrEmpty(region.colorName))
+            {
+                Color libraryColor = colorLibrary.GetColorByName(region.colorName);
+                if (region.color != libraryColor)
+                {
+                    region.color = libraryColor;
+                    changed = true;
+                }
+            }
+        }
+        
+        if (changed)
+        {
+            GeneratePreview();
+            #if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+            #endif
+        }
     }
     
     void ShrinkAndFillBorder(BorderRegion borderRegion, Color[] previewPixels, float shrinkAmount)

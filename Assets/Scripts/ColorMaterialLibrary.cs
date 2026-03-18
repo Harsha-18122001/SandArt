@@ -31,13 +31,13 @@ public class ColorMaterialLibrary : ScriptableObject
 
     public Material GetMaterialByName(string colorName)
     {
-        ColorMaterial colorMat = colorMaterials.Find(cm => cm.colorName == colorName);
+        ColorMaterial colorMat = colorMaterials.Find(cm => string.Equals(cm.colorName, colorName, System.StringComparison.OrdinalIgnoreCase));
         return colorMat?.material;
     }
 
     public Color GetColorByName(string colorName)
     {
-        ColorMaterial colorMat = colorMaterials.Find(cm => cm.colorName == colorName);
+        ColorMaterial colorMat = colorMaterials.Find(cm => string.Equals(cm.colorName, colorName, System.StringComparison.OrdinalIgnoreCase));
         return colorMat != null ? colorMat.color : Color.white;
     }
 
@@ -53,6 +53,6 @@ public class ColorMaterialLibrary : ScriptableObject
 
     public bool HasColor(string colorName)
     {
-        return colorMaterials.Exists(cm => cm.colorName == colorName);
+        return colorMaterials.Exists(cm => string.Equals(cm.colorName, colorName, System.StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Board
-  m_Shader: {fileID: -6465566751694194690, guid: edd7abf643fa4bc4e8561d4c280c97cf, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: df5bb027d94a6c44bb32b3c31ec1303f, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
@@ -16,8 +16,8 @@ Material:
   - TCP2_RIM_LIGHTING_LIGHTMASK
   - TCP2_SHADOW_LIGHT_COLOR
   - TCP2_SPECULAR
-  m_InvalidKeywords:
   - TCP2_UV_NORMALS_FULL
+  m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -143,7 +143,7 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SpecularMapType: 0
-    - _SpecularRoughness: 0.396
+    - _SpecularRoughness: 0.672
     - _SpecularToonSize: 0.25
     - _SpecularToonSmoothness: 0.05
     - _SpecularType: 0
@@ -157,7 +157,7 @@ Material:
     - _UseMobileMode: 0
     - _UseNormalMap: 0
     - _UseOcclusion: 0
-    - _UseOutline: 0
+    - _UseOutline: 1
     - _UseReflections: 0
     - _UseRim: 0
     - _UseRimLightMask: 1
@@ -165,7 +165,7 @@ Material:
     - _UseSpecular: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.34117645, g: 0.39012298, b: 0.89411765, a: 1}
+    - _BaseColor: {r: 0.5330904, g: 0.3280082, b: 0.8584906, a: 1}
     - _Color: {r: 0, g: 0.59395933, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _HColor: {r: 0.9339623, g: 0.9339623, b: 0.9339623, a: 1}
@@ -174,5 +174,6 @@ Material:
     - _ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
     - _RimColor: {r: 0.8, g: 0.8, b: 0.8, a: 0.5}
     - _SColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _SpecularColor: {r: 0.7587846, g: 0.32873687, b: 0.8603977, a: 1}
+    - _SpecularColor: {r: 2.026074, g: 0.87777907, b: 2.297397, a: 1}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1

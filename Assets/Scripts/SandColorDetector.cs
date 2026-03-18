@@ -211,8 +211,29 @@ public class SandColorDetector : MonoBehaviour
         {
             if (debugMode)
             {
-                Debug.Log($"<color=red>No matching region found for color name '{sandColorName}'</color>");
+                // Check if the color exists but all regions are full
+                bool colorExists = false;
+                foreach (var region in regionFillSettings)
+                {
+                    if (string.Equals(region.colorName, sandColorName, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        colorExists = true;
+                        break;
+                    }
+                }
+
+                if (colorExists)
+                {
+                    Debug.Log($"<color=orange>All regions for color '{sandColorName}' are already FULL. Sand piece ignored.</color>");
+                }
+                else
+                {
+                    Debug.Log($"<color=red>No matching region found for color name '{sandColorName}'. Make sure to click 'Auto-Populate Regions' on SandColorDetector if you've updated your regions!</color>");
+                }
             }
+            
+            // Always destroy the sand piece if it reaches the detector but can't be matched/filled
+            Destroy(sandPiece);
         }
     }
     
@@ -443,15 +464,15 @@ public class SandColorDetector : MonoBehaviour
     {
         foreach (var regionData in regionFillSettings)
         {
-            // Skip if region is already full
-            if (regionData.piecesCollected >= regionData.piecesNeededToFill)
+            // Match by color name (case-insensitive)
+            if (string.Equals(regionData.colorName, sandColorName, System.StringComparison.OrdinalIgnoreCase))
             {
-                continue;
-            }
-            
-            // Match by exact color name
-            if (regionData.colorName == sandColorName)
-            {
+                // Skip if region is already full
+                if (regionData.piecesCollected >= regionData.piecesNeededToFill)
+                {
+                    continue;
+                }
+                
                 return regionData;
             }
         }
@@ -517,7 +538,6 @@ public class SandColorDetector : MonoBehaviour
         return Mathf.Sqrt(dr * dr + dg * dg + db * db);
     }
     
-    // Public method to auto-populate region settings from SpriteRegionEditorTool
     public void AutoPopulateRegions()
     {
         if (regionTool == null)
@@ -532,21 +552,41 @@ public class SandColorDetector : MonoBehaviour
             return;
         }
         
+        // Map of current progress by region ID to preserve it
+        Dictionary<int, int> currentProgress = new Dictionary<int, int>();
+        foreach (var data in regionFillSettings)
+        {
+            if (!currentProgress.ContainsKey(data.regionId))
+            {
+                currentProgress.Add(data.regionId, data.piecesCollected);
+            }
+        }
+        
         regionFillSettings.Clear();
         
         for (int i = 0; i < regionTool.regions.Count; i++)
         {
             var region = regionTool.regions[i];
+            
+            // Try to restore previous progress for this region index
+            int collected = 0;
+            currentProgress.TryGetValue(i, out collected);
+            
             RegionFillData fillData = new RegionFillData
             {
                 regionId = i,
                 colorName = region.colorName, // Auto-fill from region's color name
-                piecesNeededToFill = CalculatePiecesNeeded(region.PixelCount)
+                piecesNeededToFill = CalculatePiecesNeeded(region.PixelCount),
+                piecesCollected = collected
             };
+            
+            // Recalculate progress ratio
+            fillData.fillProgress = Mathf.Clamp01((float)fillData.piecesCollected / fillData.piecesNeededToFill);
+            
             regionFillSettings.Add(fillData);
         }
         
-        Debug.Log($"Auto-populated {regionFillSettings.Count} regions with color names from SpriteRegionEditorTool.");
+        Debug.Log($"Auto-populated {regionFillSettings.Count} regions with color names from SpriteRegionEditorTool. Preserved progress for matching region IDs.");
     }
     
     int CalculatePiecesNeeded(int pixelCount)
