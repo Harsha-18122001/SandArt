@@ -56,29 +56,49 @@ public class SpriteRegionEditorToolEditor : Editor
         EditorGUILayout.EndHorizontal();
         
         // Add button to detect border regions separately
-        if (tool.detectBorderRegions)
-        {
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Border Management", EditorStyles.boldLabel);
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Detect Border Regions"))
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Border Management", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Detect Border Regions"))
             {
                 Undo.RecordObject(tool, "Detect Border Regions");
                 tool.ForceDetectBorderRegions();
                 EditorUtility.SetDirty(tool);
             }
             
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("Shrink Borders (-1px)"))
+            {
+                Undo.RecordObject(tool, "Shrink Borders");
+                tool.ShrinkBorderPixels(1);
+                EditorUtility.SetDirty(tool);
+            }
+            
+            if (GUILayout.Button("Expand Borders (+1px)"))
+            {
+                Undo.RecordObject(tool, "Expand Borders");
+                tool.ExpandBorderPixels(1);
+                EditorUtility.SetDirty(tool);
+            }
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Save Border Colors"))
             {
                 tool.SaveBorderColors();
             }
             EditorGUILayout.EndHorizontal();
-        }
 
         if (tool.regions != null && tool.regions.Count > 0)
         {
             GUILayout.Space(10);
+            
+            EditorGUILayout.BeginHorizontal();
             GUILayout.Label($"Detected Regions: {tool.regions.Count}", EditorStyles.boldLabel);
+            tool.showRegionLabels = GUILayout.Toggle(tool.showRegionLabels, "Show Scene Labels");
+            EditorGUILayout.EndHorizontal();
 
             ColorMaterialLibrary library = tool.colorLibrary;
             string[] colorNames = library != null ? library.GetAllColorNames() : new string[0];
@@ -128,6 +148,18 @@ public class SpriteRegionEditorToolEditor : Editor
 
                 // PIXEL COUNT
                 EditorGUILayout.LabelField($"{region.PixelCount} pixels", GUILayout.Width(80));
+
+                // HIGHLIGHT BUTTON
+                bool isHighlighted = (tool.highlightedRegionIndex == i);
+                if (isHighlighted) GUI.backgroundColor = Color.yellow;
+                if (GUILayout.Button(isHighlighted ? "Show All" : "Highlight", GUILayout.Width(70), GUILayout.Height(30)))
+                {
+                    if (isHighlighted)
+                        tool.GenerateHighlightPreview(-1); // Stop highlighting
+                    else
+                        tool.GenerateHighlightPreview(i);
+                }
+                GUI.backgroundColor = Color.white;
 
                 // REMOVE BUTTON
                 GUI.backgroundColor = new Color(1f, 0.5f, 0.5f);
@@ -218,6 +250,41 @@ public class SpriteRegionEditorToolEditor : Editor
                 
                 EditorGUILayout.EndVertical();
             }
+        }
+    }
+
+    void OnSceneGUI()
+    {
+        SpriteRegionEditorTool tool = (SpriteRegionEditorTool)target;
+        if (tool == null || tool.regions == null || tool.regions.Count == 0 || !tool.showRegionLabels) return;
+
+        GUIStyle style = new GUIStyle();
+        style.normal.textColor = Color.white;
+        style.fontStyle = FontStyle.Bold;
+        style.fontSize = 20;
+        style.alignment = TextAnchor.MiddleCenter;
+
+        // Draw a dark background for the text
+        GUIStyle bgStyle = new GUIStyle(GUI.skin.box);
+        bgStyle.normal.background = Texture2D.whiteTexture; // Or custom
+        
+        for (int i = 0; i < tool.regions.Count; i++)
+        {
+            if (tool.regions[i].PixelCount == 0) continue;
+
+            Vector3 worldCenter = tool.GetRegionWorldCenter(i);
+
+            Handles.BeginGUI();
+            Vector2 screenPos = HandleUtility.WorldToGUIPoint(worldCenter);
+            
+            // Draw a tiny black drop shadow for readability
+            style.normal.textColor = Color.black;
+            GUI.Label(new Rect(screenPos.x - 9, screenPos.y - 9, 20, 20), i.ToString(), style);
+            
+            // Draw white text
+            style.normal.textColor = Color.white;
+            GUI.Label(new Rect(screenPos.x - 10, screenPos.y - 10, 20, 20), i.ToString(), style);
+            Handles.EndGUI();
         }
     }
 }

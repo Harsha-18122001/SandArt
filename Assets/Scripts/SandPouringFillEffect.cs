@@ -94,9 +94,25 @@ public class SandPouringFillEffect : MonoBehaviour
         
         Color[] pixels = new Color[width * height];
         
-        // Initialize with black background
+        // Initialize with black background (or transparent if preferred, but assuming black for now)
         for (int i = 0; i < pixels.Length; i++)
             pixels[i] = Color.black;
+        
+        // Draw border regions first
+        if (regionTool.borderRegions != null)
+        {
+            foreach (var border in regionTool.borderRegions)
+            {
+                foreach (var pixel in border.pixels)
+                {
+                    int pixelIndex = pixel.y * width + pixel.x;
+                    if (pixelIndex >= 0 && pixelIndex < pixels.Length)
+                    {
+                        pixels[pixelIndex] = border.color;
+                    }
+                }
+            }
+        }
         
         // Initialize region locking
         if (useRegionLocking)
@@ -381,6 +397,22 @@ public class SandPouringFillEffect : MonoBehaviour
         // Initialize with black background
         for (int i = 0; i < pixels.Length; i++)
             pixels[i] = Color.black;
+            
+        // Draw border regions first
+        if (regionTool.borderRegions != null)
+        {
+            foreach (var border in regionTool.borderRegions)
+            {
+                foreach (var pixel in border.pixels)
+                {
+                    int pixelIndex = pixel.y * width + pixel.x;
+                    if (pixelIndex >= 0 && pixelIndex < pixels.Length)
+                    {
+                        pixels[pixelIndex] = border.color;
+                    }
+                }
+            }
+        }
         
         // Fill all regions with their base colors first
         int totalPixelsInRegions = 0;
