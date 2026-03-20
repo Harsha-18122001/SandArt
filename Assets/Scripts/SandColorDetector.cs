@@ -23,8 +23,9 @@ public class SandColorDetector : MonoBehaviour
     [SerializeField] private GameObject particleEffectObject; // Particle system to enable when detecting
     [SerializeField] private GameObject pouringParticlePrefab; // Particle to spawn and move to region
     [SerializeField] private float particleMoveSpeed = 5f; // Speed of particle movement
-    [SerializeField] private int particlesPerPiece = 2; // Number of particles spawned per sand piece
+    [SerializeField] private int particlesPerPiece = 10; // Number of particles spawned per sand piece
     [SerializeField] private float topPixelOffset = 0.2f; // Offset from top (0 = very top, higher = more downward)
+    [SerializeField] private float particleScaleMultiplier = 1.5f; // Multiplier for particle size
     
     [Header("Region Fill Settings")]
     [SerializeField] private List<RegionFillData> regionFillSettings = new List<RegionFillData>();
@@ -135,16 +136,6 @@ public class SandColorDetector : MonoBehaviour
         
         if (matchedRegion != null)
         {
-            // Check if region is unlocked
-            if (fillEffect != null && !fillEffect.IsRegionUnlocked(matchedRegion.regionId))
-            {
-                if (debugMode)
-                {
-                    Debug.Log($"<color=orange>Region {matchedRegion.regionId} is locked! Sand piece ignored.</color>");
-                }
-                return; // Don't process locked regions
-            }
-            
             // Get the color from the color library
             Color sandColor = colorLibrary.GetColorByName(sandColorName);
             
@@ -209,30 +200,40 @@ public class SandColorDetector : MonoBehaviour
         }
         else
         {
-            if (debugMode)
+            // Check if the color exists but all regions are full or locked
+            bool colorExists = false;
+            bool isLocked = false;
+            string cleanSandColorName = sandColorName != null ? sandColorName.Trim() : "";
+            
+            foreach (var region in regionFillSettings)
             {
-                // Check if the color exists but all regions are full
-                bool colorExists = false;
-                foreach (var region in regionFillSettings)
+                string rColorName = region.colorName != null ? region.colorName.Trim() : "";
+                if (string.Equals(rColorName, cleanSandColorName, System.StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.Equals(region.colorName, sandColorName, System.StringComparison.OrdinalIgnoreCase))
+                    colorExists = true;
+                    if (fillEffect != null && !fillEffect.IsRegionUnlocked(region.regionId))
                     {
-                        colorExists = true;
-                        break;
+                        isLocked = true;
                     }
                 }
+            }
 
-                if (colorExists)
-                {
-                    Debug.Log($"<color=orange>All regions for color '{sandColorName}' are already FULL. Sand piece ignored.</color>");
-                }
-                else
-                {
-                    Debug.Log($"<color=red>No matching region found for color name '{sandColorName}'. Make sure to click 'Auto-Populate Regions' on SandColorDetector if you've updated your regions!</color>");
-                }
+            if (colorExists && isLocked)
+            {
+                if (debugMode) Debug.Log($"<color=orange>All available regions for color '{sandColorName}' are either FULL or LOCKED. Sand piece NOT destroyed.</color>");
+                // DO NOT destroy the piece if it is meant for a locked region, so it can bounce/fall away
+                return;
+            }
+            else if (colorExists)
+            {
+                if (debugMode) Debug.Log($"<color=orange>All regions for color '{sandColorName}' are already FULL. Sand piece destroyed.</color>");
+            }
+            else
+            {
+                if (debugMode) Debug.Log($"<color=red>No matching region found for color name '{sandColorName}'.</color>");
             }
             
-            // Always destroy the sand piece if it reaches the detector but can't be matched/filled
+            // Destroy the sand piece if it's completely full or no matching region exists at all
             Destroy(sandPiece);
         }
     }
@@ -260,6 +261,8 @@ public class SandColorDetector : MonoBehaviour
         {
             GameObject particle = Instantiate(pouringParticlePrefab, startPos, Quaternion.identity);
             
+            particle.transform.localScale *= particleScaleMultiplier;
+            
             // Set particle color
             Renderer renderer = particle.GetComponent<Renderer>();
             if (renderer != null)
@@ -273,6 +276,7 @@ public class SandColorDetector : MonoBehaviour
             {
                 var main = ps.main;
                 main.startColor = new ParticleSystem.MinMaxGradient(color);
+                main.startSizeMultiplier *= particleScaleMultiplier;
             }
             
             // Add slight random offset to start position
@@ -462,13 +466,22 @@ public class SandColorDetector : MonoBehaviour
     
     RegionFillData FindMatchingRegionByName(string sandColorName)
     {
+        string colorToMatch = sandColorName != null ? sandColorName.Trim() : "";
         foreach (var regionData in regionFillSettings)
         {
-            // Match by color name (case-insensitive)
-            if (string.Equals(regionData.colorName, sandColorName, System.StringComparison.OrdinalIgnoreCase))
+            string regionColorName = regionData.colorName != null ? regionData.colorName.Trim() : "";
+            
+            // Match by color name (case-insensitive and trimmed)
+            if (string.Equals(regionColorName, colorToMatch, System.StringComparison.OrdinalIgnoreCase))
             {
                 // Skip if region is already full
                 if (regionData.piecesCollected >= regionData.piecesNeededToFill)
+                {
+                    continue;
+                }
+                
+                // Skip if region is locked (keeps looking for another region of the same color that IS unlocked)
+                if (fillEffect != null && !fillEffect.IsRegionUnlocked(regionData.regionId))
                 {
                     continue;
                 }

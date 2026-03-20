@@ -10,6 +10,8 @@ public class SandPouringFillEffect : MonoBehaviour
     [SerializeField] private float fillTime = 2f; // time in seconds to fill all regions
     [SerializeField] private float colorVariation = 0.4f; // 0-1, how much color varies
     [SerializeField] private float slopesteepness = 2f; // higher = steeper slope (vertical spread favored)
+    [SerializeField] private int pixelationBlockSize = 4; // Groups pixels into blocks to fill chunks simultaneously
+    [SerializeField] private float pixelationNoise = 2f; // Adds randomness to the fill progression edge
     
     [Header("Animation")]
     [SerializeField] private bool fillOnStart = true;
@@ -181,10 +183,15 @@ public class SandPouringFillEffect : MonoBehaviour
             
             foreach (var pixel in region.pixels)
             {
+                // Block coordinates for pixelated fill chunks
+                float blockX = pixelationBlockSize > 1 ? Mathf.Floor(pixel.x / pixelationBlockSize) * pixelationBlockSize : pixel.x;
+                float blockY = pixelationBlockSize > 1 ? Mathf.Floor(pixel.y / pixelationBlockSize) * pixelationBlockSize : pixel.y;
+                
                 // Calculate weighted distance for steeper slope
-                float dx = Mathf.Abs(pixel.x - bottomCenter.x);
-                float dy = Mathf.Abs(pixel.y - bottomCenter.y);
-                float weightedDistance = dx + (dy / slopesteepness);
+                float dx = Mathf.Abs(blockX - bottomCenter.x);
+                float dy = Mathf.Abs(blockY - bottomCenter.y);
+                float noise = (pixelationNoise > 0f) ? Random.Range(-pixelationNoise, pixelationNoise) : 0f;
+                float weightedDistance = dx + (dy / slopesteepness) + noise;
                 
                 PixelFillData fillData = new PixelFillData
                 {
@@ -460,12 +467,17 @@ public class SandPouringFillEffect : MonoBehaviour
             
             foreach (var pixel in region.pixels)
             {
+                // Block coordinates for pixelated fill chunks
+                float blockX = pixelationBlockSize > 1 ? Mathf.Floor(pixel.x / pixelationBlockSize) * pixelationBlockSize : pixel.x;
+                float blockY = pixelationBlockSize > 1 ? Mathf.Floor(pixel.y / pixelationBlockSize) * pixelationBlockSize : pixel.y;
+                
                 // Calculate weighted distance for steeper slope
-                float dx = Mathf.Abs(pixel.x - bottomCenter.x);
-                float dy = Mathf.Abs(pixel.y - bottomCenter.y);
+                float dx = Mathf.Abs(blockX - bottomCenter.x);
+                float dy = Mathf.Abs(blockY - bottomCenter.y);
                 
                 // Weight vertical distance less to create steeper slope
-                float weightedDistance = dx + (dy / slopesteepness);
+                float noise = (pixelationNoise > 0f) ? Random.Range(-pixelationNoise, pixelationNoise) : 0f;
+                float weightedDistance = dx + (dy / slopesteepness) + noise;
                 
                 PixelFillData fillData = new PixelFillData
                 {
