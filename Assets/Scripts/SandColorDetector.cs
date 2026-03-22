@@ -14,10 +14,17 @@ public class SandColorDetector : MonoBehaviour
         [HideInInspector] public float fillProgress = 0f; // 0 to 1
     }
     
+    [System.Serializable]
+    public class ColorTotalData
+    {
+        public string colorName;
+        public int totalPiecesNeeded;
+    }
+    
     [Header("References")]
     [SerializeField] private SpriteRegionEditorTool regionTool;
     [SerializeField] private SandPouringFillEffect fillEffect;
-    [SerializeField] private ColorMaterialLibrary colorLibrary;
+    [SerializeField] public ColorMaterialLibrary colorLibrary;
     
     [Header("Visual Effects")]
     [SerializeField] private GameObject particleEffectObject; // Particle system to enable when detecting
@@ -29,6 +36,9 @@ public class SandColorDetector : MonoBehaviour
     
     [Header("Region Fill Settings")]
     [SerializeField] private List<RegionFillData> regionFillSettings = new List<RegionFillData>();
+    
+    [Header("Color Totals (Auto-Populated)")]
+    [SerializeField] public List<ColorTotalData> totalPiecesPerColor = new List<ColorTotalData>();
     
     [Header("Detection Settings")]
     [SerializeField] private float colorMatchThreshold = 0.1f; // How close colors need to be to match
@@ -599,14 +609,76 @@ public class SandColorDetector : MonoBehaviour
             regionFillSettings.Add(fillData);
         }
         
+        RecalculateTotals();
+        
         Debug.Log($"Auto-populated {regionFillSettings.Count} regions with color names from SpriteRegionEditorTool. Preserved progress for matching region IDs.");
+    }
+    
+    public void RecalculateTotals()
+    {
+        var totalsMap = new Dictionary<string, int>();
+        foreach (var data in regionFillSettings)
+        {
+            string cName = data.colorName != null ? data.colorName.Trim() : "";
+            if (!string.IsNullOrEmpty(cName))
+            {
+                if (!totalsMap.ContainsKey(cName))
+                    totalsMap[cName] = 0;
+                totalsMap[cName] += data.piecesNeededToFill;
+            }
+        }
+        
+        totalPiecesPerColor.Clear();
+        foreach (var kvp in totalsMap)
+        {
+            totalPiecesPerColor.Add(new ColorTotalData { colorName = kvp.Key, totalPiecesNeeded = kvp.Value });
+        }
+    }
+    
+    public void AdjustColorTotal(string targetColorName, int newTotal)
+    {
+        if (newTotal <= 0) return;
+        
+        List<RegionFillData> matchingRegions = new List<RegionFillData>();
+        int currentTotal = 0;
+        foreach (var data in regionFillSettings)
+        {
+            if (string.Equals(data.colorName?.Trim(), targetColorName?.Trim(), System.StringComparison.OrdinalIgnoreCase))
+            {
+                matchingRegions.Add(data);
+                currentTotal += data.piecesNeededToFill;
+            }
+        }
+        
+        if (matchingRegions.Count == 0 || currentTotal == 0) return;
+        
+        int assignedTotal = 0;
+        for (int i = 0; i < matchingRegions.Count; i++)
+        {
+            if (i == matchingRegions.Count - 1)
+            {
+                matchingRegions[i].piecesNeededToFill = newTotal - assignedTotal;
+                if (matchingRegions[i].piecesNeededToFill < 1) matchingRegions[i].piecesNeededToFill = 1;
+            }
+            else
+            {
+                float proportion = (float)matchingRegions[i].piecesNeededToFill / currentTotal;
+                int newPieces = Mathf.RoundToInt(proportion * newTotal);
+                if (newPieces < 1) newPieces = 1;
+                matchingRegions[i].piecesNeededToFill = newPieces;
+                assignedTotal += newPieces;
+            }
+            
+            matchingRegions[i].fillProgress = Mathf.Clamp01((float)matchingRegions[i].piecesCollected / matchingRegions[i].piecesNeededToFill);
+        }
+        
+        RecalculateTotals();
     }
     
     int CalculatePiecesNeeded(int pixelCount)
     {
-        // Calculate based on region size
-        // Adjust this formula as needed
-        return Mathf.Max(1, pixelCount / 100); // 1 piece per 100 pixels
+        // Calculate based on region size, capped at a maximum of 10
+        return Mathf.Clamp(pixelCount / 100, 1, 10); // 1 piece per 100 pixels, up to 10 max
     }
     
     // Reset all region progress

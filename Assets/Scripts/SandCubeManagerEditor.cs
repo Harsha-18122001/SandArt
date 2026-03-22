@@ -199,6 +199,16 @@ public class SandCubeManagerEditor : Editor
                     EditorUtility.SetDirty(manager);
                 }
                 
+                GUILayout.Space(5);
+                GUI.color = new Color(0.7f, 1f, 0.7f); // light green
+                if (GUILayout.Button("Auto-Assign Colors & Pieces", GUILayout.Height(35)))
+                {
+                    Undo.RecordObject(manager, "Auto-Setup Cubes");
+                    manager.AutoSetupCubes();
+                    EditorUtility.SetDirty(manager);
+                }
+                GUI.color = Color.white;
+                
                 if (manager.sandCubes.Count > 0)
                 {
                     if (GUILayout.Button("Clear All Cubes", GUILayout.Height(30)))

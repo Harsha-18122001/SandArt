@@ -4,6 +4,8 @@ using UnityEditor;
 [CustomEditor(typeof(SandColorDetector))]
 public class SandColorDetectorEditor : Editor
 {
+
+
     public override void OnInspectorGUI()
     {
         SandColorDetector detector = (SandColorDetector)target;
@@ -29,11 +31,13 @@ public class SandColorDetectorEditor : Editor
         SerializedProperty particleMoveSpeed = serializedObject.FindProperty("particleMoveSpeed");
         SerializedProperty particlesPerPiece = serializedObject.FindProperty("particlesPerPiece");
         SerializedProperty topPixelOffset = serializedObject.FindProperty("topPixelOffset");
+        SerializedProperty particleScaleMultiplier = serializedObject.FindProperty("particleScaleMultiplier");
         
         EditorGUILayout.PropertyField(pouringParticlePrefab, new GUIContent("Pouring Particle Prefab"));
         EditorGUILayout.PropertyField(particleMoveSpeed, new GUIContent("Particle Move Speed"));
         EditorGUILayout.PropertyField(particlesPerPiece, new GUIContent("Particles Per Piece"));
         EditorGUILayout.PropertyField(topPixelOffset, new GUIContent("Top Pixel Offset"));
+        if (particleScaleMultiplier != null) EditorGUILayout.PropertyField(particleScaleMultiplier, new GUIContent("Particle Scale Multiplier"));
         
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Detection Settings", EditorStyles.boldLabel);
@@ -106,6 +110,43 @@ public class SandColorDetectorEditor : Editor
             EditorGUILayout.HelpBox("No regions configured. Click 'Auto-Populate Regions' to get started.", MessageType.Info);
         }
         
+        SerializedProperty totalPiecesPerColor = serializedObject.FindProperty("totalPiecesPerColor");
+        if (totalPiecesPerColor != null && totalPiecesPerColor.arraySize > 0)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Color Totals Summary", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical("box");
+            for (int i = 0; i < totalPiecesPerColor.arraySize; i++)
+            {
+                SerializedProperty elem = totalPiecesPerColor.GetArrayElementAtIndex(i);
+                string colName = elem.FindPropertyRelative("colorName").stringValue;
+                int count = elem.FindPropertyRelative("totalPiecesNeeded").intValue;
+                
+                // Draw color preview if available
+                Color previewCol = Color.white;
+                if (library != null) previewCol = library.GetColorByName(colName);
+                
+                EditorGUILayout.BeginHorizontal();
+                EditorGUI.DrawRect(GUILayoutUtility.GetRect(20, 20, GUILayout.Width(20)), previewCol);
+                EditorGUILayout.LabelField($"  {colName}:", EditorStyles.boldLabel, GUILayout.Width(100));
+                
+                int newCount = EditorGUILayout.DelayedIntField(count, GUILayout.Width(60));
+                if (newCount != count && newCount > 0)
+                {
+                    Undo.RecordObject(detector, "Adjust Color Total");
+                    detector.AdjustColorTotal(colName, newCount);
+                    EditorUtility.SetDirty(detector);
+                    EditorGUILayout.EndHorizontal();
+                    break;
+                }
+                
+                EditorGUILayout.LabelField("total pieces");
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.Space((float)2.0);
+            }
+            EditorGUILayout.EndVertical();
+        }
+        
         serializedObject.ApplyModifiedProperties();
         
         EditorGUILayout.Space();
@@ -121,6 +162,68 @@ public class SandColorDetectorEditor : Editor
         {
             detector.ResetAllRegions();
             EditorUtility.SetDirty(detector);
+        }
+    }
+}
+
+[InitializeOnLoad]
+public static class SandColorDetectorSceneHUD
+{
+    static SandColorDetectorSceneHUD()
+    {
+        SceneView.duringSceneGui += OnGlobalSceneGUI;
+    }
+
+    private static void OnGlobalSceneGUI(SceneView sceneView)
+    {
+        SandColorDetector detector = Object.FindObjectOfType<SandColorDetector>();
+        if (detector == null) return;
+
+        var totalPiecesPerColor = detector.totalPiecesPerColor;
+        
+        if (totalPiecesPerColor != null && totalPiecesPerColor.Count > 0)
+        {
+            Handles.BeginGUI();
+            GUILayout.BeginArea(new Rect(10, 10, 220, 400));
+            
+            GUIStyle boxStyle = new GUIStyle(GUI.skin.box);
+            boxStyle.normal.background = EditorGUIUtility.whiteTexture; 
+            
+            Color oldColor = GUI.color;
+            GUI.color = new Color(0.2f, 0.2f, 0.2f, 0.9f); 
+            GUILayout.BeginVertical(boxStyle);
+            GUI.color = oldColor; 
+            
+            GUIStyle titleStyle = new GUIStyle(EditorStyles.boldLabel);
+            titleStyle.normal.textColor = Color.white;
+            GUILayout.Label("Total Sand Pieces Needed", titleStyle);
+            GUILayout.Space(5);
+            
+            ColorMaterialLibrary library = detector.colorLibrary;
+            
+            for (int i = 0; i < totalPiecesPerColor.Count; i++)
+            {
+                var elem = totalPiecesPerColor[i];
+                string colName = elem.colorName;
+                int count = elem.totalPiecesNeeded;
+                
+                Color c = Color.white;
+                if (library != null) c = library.GetColorByName(colName);
+                
+                GUILayout.BeginHorizontal();
+                Rect r = GUILayoutUtility.GetRect(15, 15, GUILayout.Width(15));
+                EditorGUI.DrawRect(r, c);
+                
+                GUIStyle textStyle = new GUIStyle(EditorStyles.boldLabel);
+                textStyle.normal.textColor = Color.white;
+                GUILayout.Label($"  {colName}: {count}", textStyle);
+                GUILayout.EndHorizontal();
+                GUILayout.Space(2);
+            }
+            
+            GUILayout.EndVertical();
+            GUILayout.EndArea();
+            Handles.EndGUI();
         }
     }
 }

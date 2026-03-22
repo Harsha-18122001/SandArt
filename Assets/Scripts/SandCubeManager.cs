@@ -163,6 +163,119 @@ public class SandCubeManager : MonoBehaviour
         cubeData.cubeObject = cube;
     }
     
+    [ContextMenu("Auto-Setup Cubes (Colors & Pieces)")]
+    public void AutoSetupCubes()
+    {
+        if (colorLibrary == null)
+        {
+            Debug.LogWarning("Color Material Library is not assigned!");
+            return;
+        }
+
+        SandColorDetector detector = FindObjectOfType<SandColorDetector>();
+        List<string> requiredColors = new List<string>();
+        Dictionary<string, int> pieceTotals = new Dictionary<string, int>();
+
+        if (detector != null && detector.totalPiecesPerColor != null && detector.totalPiecesPerColor.Count > 0)
+        {
+            foreach (var item in detector.totalPiecesPerColor)
+            {
+                if (item.totalPiecesNeeded > 0)
+                {
+                    requiredColors.Add(item.colorName);
+                    pieceTotals[item.colorName] = item.totalPiecesNeeded;
+                }
+            }
+        }
+        else
+        {
+            string[] names = colorLibrary.GetAllColorNames();
+            foreach (var n in names)
+            {
+                requiredColors.Add(n);
+                pieceTotals[n] = 10;
+            }
+        }
+
+        if (requiredColors.Count == 0)
+        {
+            Debug.LogWarning("No colors found to assign!");
+            return;
+        }
+
+        // Gather manual child transforms created directly inside the scene
+        List<GameObject> existingCubes = new List<GameObject>();
+        foreach (var c in sandCubes) if (c.cubeObject != null) existingCubes.Add(c.cubeObject);
+        
+        List<Transform> manualChildren = new List<Transform>();
+        foreach (Transform child in transform)
+        {
+            if (!existingCubes.Contains(child.gameObject))
+            {
+                manualChildren.Add(child);
+            }
+        }
+
+        if (manualChildren.Count > 0)
+        {
+            string defaultPrefab = sandCubePrefabs.Count > 0 ? sandCubePrefabs[0].prefabName : "";
+            foreach (var child in manualChildren)
+            {
+                sandCubes.Add(new SandCubeData
+                {
+                    position = child.localPosition,
+                    rotation = child.localEulerAngles,
+                    prefabName = defaultPrefab,
+                    colorName = requiredColors[0],
+                    sandPiecesCount = 10
+                });
+                
+                #if UNITY_EDITOR
+                DestroyImmediate(child.gameObject);
+                #else
+                Destroy(child.gameObject);
+                #endif
+            }
+        }
+
+        if (sandCubes.Count == 0) return;
+
+        List<string> assignedColors = new List<string>();
+        for (int i = 0; i < sandCubes.Count; i++)
+        {
+            assignedColors.Add(requiredColors[i % requiredColors.Count]);
+        }
+        
+        for (int i = 0; i < assignedColors.Count; i++)
+        {
+            int rnd = Random.Range(i, assignedColors.Count);
+            string tmp = assignedColors[i];
+            assignedColors[i] = assignedColors[rnd];
+            assignedColors[rnd] = tmp;
+        }
+        
+        Dictionary<string, int> colorCubeCount = new Dictionary<string, int>();
+        foreach (var c in assignedColors)
+        {
+            if (!colorCubeCount.ContainsKey(c)) colorCubeCount[c] = 0;
+            colorCubeCount[c]++;
+        }
+
+        for (int i = 0; i < sandCubes.Count; i++)
+        {
+            string col = assignedColors[i];
+            sandCubes[i].colorName = col;
+            
+            int totalPiecesForColor = pieceTotals.ContainsKey(col) ? pieceTotals[col] : 10;
+            int numCubesSharingColor = colorCubeCount[col];
+            
+            sandCubes[i].sandPiecesCount = Mathf.CeilToInt((float)totalPiecesForColor / numCubesSharingColor);
+        }
+
+        CreateOrUpdateCubes();
+        Debug.Log("Successfully auto-assigned colors and pieces, and updated cubes!");
+    }
+
     public void ClearAllCubes()
     {
         foreach (var cubeData in sandCubes)

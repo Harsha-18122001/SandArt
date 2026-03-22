@@ -10,24 +10,24 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ab58bf1126fabfd42bfcbbf01fc82343, type: 3}
-  m_Name: smile
+  m_Name: tiger
   m_EditorClassIdentifier: 
   colorMaterials:
   - colorName: Dark Pink
-    material: {fileID: 2100000, guid: 3c938d3eb52db7f41b752ee3b50a5376, type: 2}
-    color: {r: 0.90588236, g: 0.082352914, b: 0.18766084, a: 1}
+    material: {fileID: 2100000, guid: 62bfc5a5411f71145988681b4bb3b2cd, type: 2}
+    color: {r: 0.9339623, g: 0.3127893, b: 0.4289799, a: 1}
   - colorName: orange
     material: {fileID: 2100000, guid: d99fb234303497343bd1b08e77d5202c, type: 2}
-    color: {r: 0.9764706, g: 0.62352943, b: 0.1764706, a: 1}
+    color: {r: 0.9372549, g: 0.49411765, b: 0.12156863, a: 1}
   - colorName: white
     material: {fileID: 2100000, guid: eea6a16e0e9d25b419f13b6ee7d18942, type: 2}
-    color: {r: 1, g: 1, b: 0.5235849, a: 1}
-  - colorName: Yellow
-    material: {fileID: 2100000, guid: 3bd84288de9aff841a20314a3dff6a14, type: 2}
-    color: {r: 1, g: 0.92036587, b: 0.16509432, a: 1}
+    color: {r: 1, g: 1, b: 0.98039216, a: 1}
   - colorName: Black
     material: {fileID: 2100000, guid: 6502464c7b9ee5e478d1d6d93a51d5c1, type: 2}
-    color: {r: 0.5471698, g: 0.259042, b: 0.19873619, a: 1}
+    color: {r: 0, g: 0, b: 0, a: 1}
   - colorName: Pink
-    material: {fileID: 2100000, guid: 62bfc5a5411f71145988681b4bb3b2cd, type: 2}
-    color: {r: 1, g: 0.40392157, b: 0.8745098, a: 1}
+    material: {fileID: 2100000, guid: 446c4397972b58341859f3abd4281ec1, type: 2}
+    color: {r: 0.8679245, g: 0.5608757, b: 0.62910885, a: 1}
+  - colorName: Green
+    material: {fileID: 2100000, guid: 7e2112eccfde1fc48b8ba47c0e70d140, type: 2}
+    color: {r: 0.14509805, g: 0.8, b: 0.62352943, a: 1}

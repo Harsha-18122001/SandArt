@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab58bf1126fabfd42bfcbbf01fc82343, type: 3}
+  m_Name: ColorMaterialLibrary 5
+  m_EditorClassIdentifier: 
+  colorMaterials:
+  - colorName: Brown
+    material: {fileID: 2100000, guid: ba326685043895d4ea9e2b916ec64268, type: 2}
+    color: {r: 0.4811321, g: 0.254183, b: 0.19744574, a: 1}
+  - colorName: Blue
+    material: {fileID: 2100000, guid: 295abbb70fc450f458cfa2433d12d141, type: 2}
+    color: {r: 0.3066038, g: 0.78460485, b: 1, a: 1}
+  - colorName: Green
+    material: {fileID: 2100000, guid: 7e2112eccfde1fc48b8ba47c0e70d140, type: 2}
+    color: {r: 0.1602247, g: 0.5754717, b: 0.09500711, a: 1}
+  - colorName: Dark Green
+    material: {fileID: 2100000, guid: e5718602cdb0c74468a4c19fa0e1d9d0, type: 2}
+    color: {r: 0.20669281, g: 0.3773585, b: 0.105019584, a: 1}
+  - colorName: Grey
+    material: {fileID: 2100000, guid: 6502464c7b9ee5e478d1d6d93a51d5c1, type: 2}
+    color: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 1}
+  - colorName: white
+    material: {fileID: 2100000, guid: 3decedca6365a4648a0afcaa4a77f40e, type: 2}
+    color: {r: 1, g: 0.95956874, b: 0.9292453, a: 1}
+  - colorName: light brown
+    material: {fileID: 2100000, guid: 04ede9b635d1bb645b3b9cd98617a117, type: 2}
+    color: {r: 0.6603774, g: 0.3241334, b: 0.11525454, a: 1}
+  - colorName: Starry blue
+    material: {fileID: 2100000, guid: eaa203861c35e314b8de8d88f954a108, type: 2}
+    color: {r: 0.03244037, g: 0.09727112, b: 0.254717, a: 1}
+  - colorName: Sky Blue
+    material: {fileID: 2100000, guid: 5cbce5d39c56d2248a7b1051c4d23b3f, type: 2}
+    color: {r: 0.6933962, g: 0.9163381, b: 1, a: 1}
+  - colorName: Light grey
+    material: {fileID: 2100000, guid: 7c680efc0760e2d448968ca4c5d76ce5, type: 2}
+    color: {r: 0.7830189, g: 0.7830189, b: 0.7830189, a: 1}
+  - colorName: Dark Blue
+    material: {fileID: 2100000, guid: d19881a99a1793a4f91991b44dbe290a, type: 2}
+    color: {r: 0.056559276, g: 0.1528774, b: 0.38679248, a: 1}
