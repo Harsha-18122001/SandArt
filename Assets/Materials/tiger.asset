@@ -15,7 +15,7 @@ MonoBehaviour:
   colorMaterials:
   - colorName: Dark Pink
     material: {fileID: 2100000, guid: 62bfc5a5411f71145988681b4bb3b2cd, type: 2}
-    color: {r: 0.9339623, g: 0.3127893, b: 0.4289799, a: 1}
+    color: {r: 0.83137256, g: 0.3647059, b: 0.4, a: 1}
   - colorName: orange
     material: {fileID: 2100000, guid: d99fb234303497343bd1b08e77d5202c, type: 2}
     color: {r: 0.9372549, g: 0.49411765, b: 0.12156863, a: 1}
@@ -30,4 +30,4 @@ MonoBehaviour:
     color: {r: 0.8679245, g: 0.5608757, b: 0.62910885, a: 1}
   - colorName: Green
     material: {fileID: 2100000, guid: 7e2112eccfde1fc48b8ba47c0e70d140, type: 2}
-    color: {r: 0.14509805, g: 0.8, b: 0.62352943, a: 1}
+    color: {r: 0.16078432, g: 0.7647059, b: 0.5411765, a: 1}

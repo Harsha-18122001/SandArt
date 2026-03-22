@@ -14,10 +14,21 @@ public class SpriteRegionEditorToolEditor : Editor
         SerializedProperty colorLibrary = serializedObject.FindProperty("colorLibrary");
         SerializedProperty detectBorderRegions = serializedObject.FindProperty("detectBorderRegions");
         SerializedProperty borderShrinkAmount = serializedObject.FindProperty("borderShrinkAmount");
+        SerializedProperty autoDetectPictureColors = serializedObject.FindProperty("autoDetectPictureColors");
+        SerializedProperty colorTolerance = serializedObject.FindProperty("colorTolerance");
+        SerializedProperty minRegionPixels = serializedObject.FindProperty("minRegionPixels");
 
         EditorGUILayout.PropertyField(sourceSprite);
         EditorGUILayout.PropertyField(colorLibrary);
         EditorGUILayout.PropertyField(detectBorderRegions, new GUIContent("Detect Border Regions"));
+        EditorGUILayout.PropertyField(autoDetectPictureColors, new GUIContent("Auto Detect Picture Colors"));
+        
+        if (autoDetectPictureColors.boolValue)
+        {
+            EditorGUILayout.PropertyField(colorTolerance, new GUIContent("Color Tolerance"));
+        }
+        
+        EditorGUILayout.PropertyField(minRegionPixels, new GUIContent("Min Region Pixels"));
         
         if (tool.detectBorderRegions && tool.borderRegions != null && tool.borderRegions.Count > 0)
         {
@@ -54,6 +65,74 @@ public class SpriteRegionEditorToolEditor : Editor
             EditorUtility.SetDirty(tool);
         }
         EditorGUILayout.EndHorizontal();
+        
+        GUILayout.Space(5);
+        if (tool.regions != null && tool.regions.Count > 0)
+        {
+            if (GUILayout.Button("Create Color Library from Regions"))
+            {
+                string path = EditorUtility.SaveFilePanelInProject(
+                    "Save Color Library", 
+                    tool.gameObject.name + "_ColorLibrary", 
+                    "asset", 
+                    "Save color library based on detected regions"
+                );
+
+                if (!string.IsNullOrEmpty(path)) 
+                {
+                    ColorMaterialLibrary newLib = ScriptableObject.CreateInstance<ColorMaterialLibrary>();
+                    System.Collections.Generic.HashSet<string> seenColors = new System.Collections.Generic.HashSet<string>();
+                    
+                    AssetDatabase.CreateAsset(newLib, path);
+                    
+                    int colorIdx = 1;
+                    foreach(var r in tool.regions) 
+                    {
+                        string hex = ColorUtility.ToHtmlStringRGB(r.color);
+                        string colorName = "Color_" + colorIdx.ToString() + "_" + hex;
+                        
+                        if (!seenColors.Contains(hex)) 
+                        {
+                            seenColors.Add(hex);
+                            var cm = new ColorMaterialLibrary.ColorMaterial();
+                            cm.colorName = colorName;
+                            cm.color = r.color;
+                            
+                            // Try to find a valid shader
+                            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                            if (shader == null) shader = Shader.Find("Standard");
+                            
+                            if (shader != null) {
+                                Material mat = new Material(shader);
+                                mat.color = r.color;
+                                mat.name = "Mat_" + colorName;
+                                AssetDatabase.AddObjectToAsset(mat, newLib);
+                                cm.material = mat;
+                            }
+                            
+                            newLib.colorMaterials.Add(cm);
+                            colorIdx++;
+                        }
+                        
+                        // Update the region's assigned color name immediately to the generated name
+                        // We must find the assigned name corresponding to this color by using the hex representation 
+                        string assignedName = newLib.colorMaterials.Find(c => ColorUtility.ToHtmlStringRGB(c.color) == hex).colorName;
+                        r.colorName = assignedName;
+                    }
+                    
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                    
+                    Undo.RecordObject(tool, "Assign generated Color Library");
+                    tool.colorLibrary = newLib;
+                    EditorUtility.SetDirty(tool);
+                    tool.GeneratePreview();
+                    
+                    Debug.Log($"Created new ColorMaterialLibrary at {path} with {newLib.colorMaterials.Count} unique colors.");
+                }
+            }
+        }
+
         
         // Add button to detect border regions separately
         EditorGUILayout.Space();

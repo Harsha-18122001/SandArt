@@ -44,6 +44,9 @@ public class SandPouringFillEffect : MonoBehaviour
     private HashSet<int> unlockedRegions = new HashSet<int>();
     private int regionsCompleted = 0;
     
+    // Cached pixels array to avoid massive garbage collection on mobile
+    private Color32[] fillPixels;
+    
     private class PixelFillData
     {
         public Vector2Int position;
@@ -94,11 +97,12 @@ public class SandPouringFillEffect : MonoBehaviour
         fillTexture.filterMode = FilterMode.Point;
         fillTexture.wrapMode = TextureWrapMode.Clamp;
         
-        Color[] pixels = new Color[width * height];
+        fillPixels = new Color32[width * height];
+        Color32 black32 = new Color32(0, 0, 0, 255);
         
         // Initialize with black background (or transparent if preferred, but assuming black for now)
-        for (int i = 0; i < pixels.Length; i++)
-            pixels[i] = Color.black;
+        for (int i = 0; i < fillPixels.Length; i++)
+            fillPixels[i] = black32;
         
         // Draw border regions first
         if (regionTool.borderRegions != null)
@@ -108,9 +112,9 @@ public class SandPouringFillEffect : MonoBehaviour
                 foreach (var pixel in border.pixels)
                 {
                     int pixelIndex = pixel.y * width + pixel.x;
-                    if (pixelIndex >= 0 && pixelIndex < pixels.Length)
+                    if (pixelIndex >= 0 && pixelIndex < fillPixels.Length)
                     {
-                        pixels[pixelIndex] = border.color;
+                        fillPixels[pixelIndex] = border.color;
                     }
                 }
             }
@@ -145,30 +149,29 @@ public class SandPouringFillEffect : MonoBehaviour
             }
         }
         
-        // Fill all regions with their base colors (or locked color)
         for (int regionIndex = 0; regionIndex < regionTool.regions.Count; regionIndex++)
         {
             var region = regionTool.regions[regionIndex];
             bool isUnlocked = !useRegionLocking || unlockedRegions.Contains(regionIndex);
             
-            Color regionColor;
+            Color32 regionColor32;
             if (isUnlocked)
             {
                 // Unlocked regions show lighter version of their color
-                regionColor = LightenColor(region.color, unlockedRegionLightness);
+                regionColor32 = LightenColor(region.color, unlockedRegionLightness);
             }
             else
             {
                 // Locked regions show grey
-                regionColor = lockedRegionColor;
+                regionColor32 = lockedRegionColor;
             }
             
             foreach (var pixel in region.pixels)
             {
                 int pixelIndex = pixel.y * width + pixel.x;
-                if (pixelIndex >= 0 && pixelIndex < pixels.Length)
+                if (pixelIndex >= 0 && pixelIndex < fillPixels.Length)
                 {
-                    pixels[pixelIndex] = regionColor;
+                    fillPixels[pixelIndex] = regionColor32;
                 }
             }
         }
@@ -210,7 +213,7 @@ public class SandPouringFillEffect : MonoBehaviour
             regionTargetProgress[regionIndex] = 0f;
         }
         
-        fillTexture.SetPixels(pixels);
+        fillTexture.SetPixels32(fillPixels);
         fillTexture.Apply();
         
         // Update sprite renderer
@@ -297,21 +300,19 @@ public class SandPouringFillEffect : MonoBehaviour
         unlockedRegions.Add(regionId);
         Debug.Log($"<color=green>Unlocked region {regionId}!</color>");
         
-        // Reveal the region's lighter color (not full color yet)
         var region = regionTool.regions[regionId];
-        Color lighterColor = LightenColor(region.color, unlockedRegionLightness);
-        Color[] pixels = fillTexture.GetPixels();
+        Color32 lighterColor32 = LightenColor(region.color, unlockedRegionLightness);
         
         foreach (var pixel in region.pixels)
         {
             int pixelIndex = pixel.y * width + pixel.x;
-            if (pixelIndex >= 0 && pixelIndex < pixels.Length)
+            if (pixelIndex >= 0 && pixelIndex < fillPixels.Length)
             {
-                pixels[pixelIndex] = lighterColor;
+                fillPixels[pixelIndex] = lighterColor32;
             }
         }
         
-        fillTexture.SetPixels(pixels);
+        fillTexture.SetPixels32(fillPixels);
         fillTexture.Apply();
     }
     
@@ -352,21 +353,19 @@ public class SandPouringFillEffect : MonoBehaviour
             // Calculate pixels to fill
             int pixelsToFill = Mathf.RoundToInt(regionPixels.Count * currentProgress);
             
-            Color[] pixels = fillTexture.GetPixels();
-            
             // Fill pixels up to the current progress with varied colors
             for (int i = 0; i < pixelsToFill && i < regionPixels.Count; i++)
             {
                 var fillData = regionPixels[i];
                 int pixelIndex = fillData.position.y * width + fillData.position.x;
                 
-                if (pixelIndex >= 0 && pixelIndex < pixels.Length)
+                if (pixelIndex >= 0 && pixelIndex < fillPixels.Length)
                 {
-                    pixels[pixelIndex] = fillData.targetColor;
+                    fillPixels[pixelIndex] = fillData.targetColor;
                 }
             }
             
-            fillTexture.SetPixels(pixels);
+            fillTexture.SetPixels32(fillPixels);
             fillTexture.Apply();
             
             yield return null;
@@ -399,11 +398,12 @@ public class SandPouringFillEffect : MonoBehaviour
         fillTexture.filterMode = FilterMode.Point;
         fillTexture.wrapMode = TextureWrapMode.Clamp;
         
-        Color[] pixels = new Color[width * height];
+        fillPixels = new Color32[width * height];
+        Color32 black32 = new Color32(0, 0, 0, 255);
         
         // Initialize with black background
-        for (int i = 0; i < pixels.Length; i++)
-            pixels[i] = Color.black;
+        for (int i = 0; i < fillPixels.Length; i++)
+            fillPixels[i] = black32;
             
         // Draw border regions first
         if (regionTool.borderRegions != null)
@@ -413,9 +413,9 @@ public class SandPouringFillEffect : MonoBehaviour
                 foreach (var pixel in border.pixels)
                 {
                     int pixelIndex = pixel.y * width + pixel.x;
-                    if (pixelIndex >= 0 && pixelIndex < pixels.Length)
+                    if (pixelIndex >= 0 && pixelIndex < fillPixels.Length)
                     {
-                        pixels[pixelIndex] = border.color;
+                        fillPixels[pixelIndex] = border.color;
                     }
                 }
             }
@@ -428,12 +428,13 @@ public class SandPouringFillEffect : MonoBehaviour
             var region = regionTool.regions[regionIndex];
             Debug.Log($"Region {regionIndex}: {region.pixels.Count} pixels, color: {region.color}");
             
+            Color32 regionColor32 = region.color;
             foreach (var pixel in region.pixels)
             {
                 int pixelIndex = pixel.y * width + pixel.x;
-                if (pixelIndex >= 0 && pixelIndex < pixels.Length)
+                if (pixelIndex >= 0 && pixelIndex < fillPixels.Length)
                 {
-                    pixels[pixelIndex] = region.color;
+                    fillPixels[pixelIndex] = regionColor32;
                     totalPixelsInRegions++;
                 }
             }
@@ -441,7 +442,7 @@ public class SandPouringFillEffect : MonoBehaviour
         
         Debug.Log($"Total pixels in all regions: {totalPixelsInRegions}");
         
-        fillTexture.SetPixels(pixels);
+        fillTexture.SetPixels32(fillPixels);
         fillTexture.Apply();
         
         // Update sprite renderer
@@ -515,22 +516,19 @@ public class SandPouringFillEffect : MonoBehaviour
             // Only update pixels if we have new ones to fill
             if (endIndex > currentPixelIndex)
             {
-                // Get current pixels array
-                Color[] currentPixels = fillTexture.GetPixels();
-                
                 // Update pixels with varied colors
                 for (int i = currentPixelIndex; i < endIndex; i++)
                 {
                     var fillData = allPixels[i];
                     int pixelIndex = fillData.position.y * width + fillData.position.x;
                     
-                    if (pixelIndex >= 0 && pixelIndex < currentPixels.Length)
+                    if (pixelIndex >= 0 && pixelIndex < fillPixels.Length)
                     {
-                        currentPixels[pixelIndex] = fillData.targetColor;
+                        fillPixels[pixelIndex] = (Color32)fillData.targetColor;
                     }
                 }
                 
-                fillTexture.SetPixels(currentPixels);
+                fillTexture.SetPixels32(fillPixels);
                 fillTexture.Apply();
                 
                 currentPixelIndex = endIndex;
@@ -542,20 +540,18 @@ public class SandPouringFillEffect : MonoBehaviour
         // Ensure all pixels are filled at the end
         if (currentPixelIndex < allPixels.Count)
         {
-            Color[] finalPixels = fillTexture.GetPixels();
-            
             for (int i = currentPixelIndex; i < allPixels.Count; i++)
             {
                 var fillData = allPixels[i];
                 int pixelIndex = fillData.position.y * width + fillData.position.x;
                 
-                if (pixelIndex >= 0 && pixelIndex < finalPixels.Length)
+                if (pixelIndex >= 0 && pixelIndex < fillPixels.Length)
                 {
-                    finalPixels[pixelIndex] = fillData.targetColor;
+                    fillPixels[pixelIndex] = fillData.targetColor;
                 }
             }
             
-            fillTexture.SetPixels(finalPixels);
+            fillTexture.SetPixels32(fillPixels);
             fillTexture.Apply();
         }
         

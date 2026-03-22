@@ -13,6 +13,14 @@ public class SpriteRegionEditorTool : MonoBehaviour
     public bool detectBorderRegions = true;
     [SerializeField] [Range(0f, 1f)] private float borderShrinkAmount = 0f; // 0 = no shrink, 1 = remove all border
     
+    [Header("Color Detection")]
+    public bool autoDetectPictureColors = true;
+    [Range(0f, 1f)]
+    public float colorTolerance = 0.1f;
+    [Tooltip("Regions smaller than this amount of pixels will be ignored.")]
+    public int minRegionPixels = 10;
+
+    
     [System.Serializable]
     public class BorderRegion
     {
@@ -203,35 +211,93 @@ public class SpriteRegionEditorTool : MonoBehaviour
                 if (handled[idx]) continue;
 
                 Color c = sourcePixels[idx];
-                bool isLocallyWhite = c.r > whiteThreshold && c.g > whiteThreshold && c.b > whiteThreshold;
-
-                if (isLocallyWhite)
-                {
-                    Region region = new Region { regionName = $"Region {regions.Count}" };
-                    FastFloodFill(idx, region.pixels, handled, true);
-                    regions.Add(region);
-                }
-                else if (detectBorderRegions)
-                {
-                    BorderRegion bRegion = new BorderRegion { regionName = $"Border {borderRegions.Count}" };
-                    FastFloodFill(idx, bRegion.pixels, handled, false);
-                    
-                    if (existingBorderColors.TryGetValue(bRegion.regionName, out Color savedColor))
-                        bRegion.color = savedColor;
-                    else
-                        bRegion.color = Color.black;
-
-                    borderRegions.Add(bRegion);
-                }
-                else
+                
+                if (c.a < 0.1f) 
                 {
                     handled[idx] = true;
+                    continue;
+                }
+
+                if (autoDetectPictureColors) 
+                {
+                    bool isBorder = detectBorderRegions && (c.r < 0.2f && c.g < 0.2f && c.b < 0.2f);
+                    
+                    if (!isBorder)
+                    {
+                        Region region = new Region { regionName = $"Region {regions.Count}" };
+                        FastFloodFillColor(idx, region.pixels, handled, c, false);
+                        
+                        region.color = c;
+                        region.colorName = GetClosestColorName(c);
+                        
+                        if (!string.IsNullOrEmpty(region.colorName) && colorLibrary != null)
+                        {
+                            region.color = colorLibrary.GetColorByName(region.colorName);
+                        }
+                        
+                        if (region.pixels.Count >= minRegionPixels)
+                        {
+                            regions.Add(region);
+                        }
+                    }
+                    else if (detectBorderRegions)
+                    {
+                        BorderRegion bRegion = new BorderRegion { regionName = $"Border {borderRegions.Count}" };
+                        FastFloodFillColor(idx, bRegion.pixels, handled, c, true);
+                        
+                        if (existingBorderColors.TryGetValue(bRegion.regionName, out Color savedColor))
+                            bRegion.color = savedColor;
+                        else
+                            bRegion.color = Color.black;
+
+                        if (bRegion.pixels.Count >= minRegionPixels)
+                        {
+                            borderRegions.Add(bRegion);
+                        }
+                    }
+                    else
+                    {
+                        handled[idx] = true;
+                    }
+                }
+                else 
+                {
+                    bool isLocallyWhite = c.r > whiteThreshold && c.g > whiteThreshold && c.b > whiteThreshold;
+
+                    if (isLocallyWhite)
+                    {
+                        Region region = new Region { regionName = $"Region {regions.Count}" };
+                        FastFloodFill(idx, region.pixels, handled, true);
+                        if (region.pixels.Count >= minRegionPixels)
+                        {
+                            regions.Add(region);
+                        }
+                    }
+                    else if (detectBorderRegions)
+                    {
+                        BorderRegion bRegion = new BorderRegion { regionName = $"Border {borderRegions.Count}" };
+                        FastFloodFill(idx, bRegion.pixels, handled, false);
+                        
+                        if (existingBorderColors.TryGetValue(bRegion.regionName, out Color savedColor))
+                            bRegion.color = savedColor;
+                        else
+                            bRegion.color = Color.black;
+
+                        if (bRegion.pixels.Count >= minRegionPixels)
+                        {
+                            borderRegions.Add(bRegion);
+                        }
+                    }
+                    else
+                    {
+                        handled[idx] = true;
+                    }
                 }
             }
         }
 
-        // Apply fair color distribution
-        if (colorLibrary != null && colorLibrary.colorMaterials.Count > 0)
+        // Apply fair color distribution only if we aren't autodetecting exact picture colors
+        if (!autoDetectPictureColors && colorLibrary != null && colorLibrary.colorMaterials.Count > 0)
         {
             List<string> fairColors = GetFairColorDistribution(regions.Count);
             for (int i = 0; i < regions.Count && i < fairColors.Count; i++)
@@ -280,6 +346,62 @@ public class SpriteRegionEditorTool : MonoBehaviour
                 {
                     handledMap[idx] = true;
                     queue.Enqueue(idx);
+                }
+            }
+        }
+    }
+
+    private void FastFloodFillColor(int startIdx, List<Vector2Int> pixelList, bool[] handledMap, Color targetColor, bool isBorderMode)
+    {
+        Queue<int> queue = new Queue<int>(1024);
+        queue.Enqueue(startIdx);
+        handledMap[startIdx] = true;
+
+        while (queue.Count > 0)
+        {
+            int idx = queue.Dequeue();
+            int px = idx % width;
+            int py = idx / width;
+            pixelList.Add(new Vector2Int(px, py));
+
+            CheckFastNeighborColor(px + 1, py, queue, handledMap, targetColor, isBorderMode);
+            CheckFastNeighborColor(px - 1, py, queue, handledMap, targetColor, isBorderMode);
+            CheckFastNeighborColor(px, py + 1, queue, handledMap, targetColor, isBorderMode);
+            CheckFastNeighborColor(px, py - 1, queue, handledMap, targetColor, isBorderMode);
+        }
+    }
+
+    private void CheckFastNeighborColor(int x, int y, Queue<int> queue, bool[] handledMap, Color targetColor, bool isBorderMode)
+    {
+        if (x >= 0 && x < width && y >= 0 && y < height)
+        {
+            int idx = y * width + x;
+            if (!handledMap[idx])
+            {
+                Color c = sourcePixels[idx];
+                if (c.a < 0.1f) return;
+                
+                if (isBorderMode)
+                {
+                    bool isDark = c.r < 0.2f && c.g < 0.2f && c.b < 0.2f;
+                    if (isDark)
+                    {
+                        handledMap[idx] = true;
+                        queue.Enqueue(idx);
+                    }
+                }
+                else
+                {
+                    bool isDark = c.r < 0.2f && c.g < 0.2f && c.b < 0.2f;
+                    if (!isDark)
+                    {
+                        float dist = Mathf.Max(Mathf.Abs(c.r - targetColor.r), Mathf.Abs(c.g - targetColor.g), Mathf.Abs(c.b - targetColor.b));
+                        if (dist <= colorTolerance)
+                        {
+                            handledMap[idx] = true;
+                            queue.Enqueue(idx);
+                        }
+                    }
                 }
             }
         }
