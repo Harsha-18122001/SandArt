@@ -623,7 +623,7 @@ public class SandCubeMovement : MonoBehaviour
         }
     }
 
-   
+/*   
     // Visualize the movement direction in the editor
     void OnDrawGizmosSelected()
     {
@@ -653,7 +653,7 @@ public class SandCubeMovement : MonoBehaviour
             Gizmos.DrawRay(arrowTransform.position, arrowTransform.forward * 2f);
         }
     }
-    
+    */
     // Public properties for inspector control
     public float MoveSpeed
     {

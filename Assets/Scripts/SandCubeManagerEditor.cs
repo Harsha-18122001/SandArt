@@ -8,6 +8,163 @@ public class SandCubeManagerEditor : Editor
     private Vector3 newCubeRotation = Vector3.zero;
     private int selectedColorIndex = 0;
     private int selectedPrefabIndex = 0;
+
+    // Grid System Additions
+    private bool showGridPlacement = true;
+    private int gridCols = 3;
+    private int gridRows = 2;
+    private float gridSpacingX = 2.0f;
+    private float gridSpacingY = 2.0f;
+    private Vector2 gridOffset = Vector2.zero;
+    private bool gridUseXZ = false;
+    
+    private void OnSceneGUI()
+    {
+        SandCubeManager manager = (SandCubeManager)target;
+        if (!showGridPlacement || manager == null) return;
+        
+        Event e = Event.current;
+        int controlID = GUIUtility.GetControlID("GridPlacement".GetHashCode(), FocusType.Passive);
+        
+        Plane plane;
+        if (gridUseXZ)
+            plane = new Plane(manager.transform.up, manager.transform.position);
+        else
+            plane = new Plane(-manager.transform.forward, manager.transform.position);
+
+        Vector3 mouseWorldPos = Vector3.zero;
+        bool hitPlane = false;
+        
+        Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+        if (plane.Raycast(ray, out float enter))
+        {
+            hitPlane = true;
+            mouseWorldPos = ray.GetPoint(enter);
+        }
+
+        Color oldColor = Handles.color;
+        
+        for (int y = 0; y < gridRows; y++)
+        {
+            for (int x = 0; x < gridCols; x++)
+            {
+                float posX = (x - (gridCols - 1) * 0.5f) * gridSpacingX + gridOffset.x;
+                float posY = (y - (gridRows - 1) * 0.5f) * gridSpacingY + gridOffset.y;
+                
+                Vector3 localPos = gridUseXZ 
+                    ? new Vector3(posX, 0, posY) 
+                    : new Vector3(posX, posY, 0);
+                    
+                Vector3 worldPos = manager.transform.TransformPoint(localPos);
+                
+                int existingCubeIndex = -1;
+                for (int i = 0; i < manager.sandCubes.Count; i++)
+                {
+                    if (Vector3.Distance(manager.sandCubes[i].position, localPos) < 0.1f)
+                    {
+                        existingCubeIndex = i;
+                        break;
+                    }
+                }
+                
+                float size = Mathf.Min(gridSpacingX, gridSpacingY) * 0.45f;
+                Vector3 boxSize = gridUseXZ 
+                    ? new Vector3(size * 2, 0.1f, size * 2) 
+                    : new Vector3(size * 2, size * 2, 0.1f);
+                    
+                if (existingCubeIndex >= 0)
+                {
+                    Handles.color = new Color(0.5f, 0.5f, 0.5f, 0.3f);
+                    Handles.DrawWireCube(worldPos, boxSize);
+                }
+                else
+                {
+                    Handles.color = new Color(0.2f, 0.8f, 1f, 0.8f);
+                    Handles.DrawWireCube(worldPos, boxSize);
+                }
+                
+                // Interaction logic
+                if (hitPlane)
+                {
+                    float distToMouse = Vector3.Distance(worldPos, mouseWorldPos);
+                    if (distToMouse < size * 1.2f) // Hovering this cell
+                    {
+                        // Hover highlight
+                        Handles.color = new Color(1f, 1f, 0f, 0.6f);
+                        Handles.DrawWireCube(worldPos, boxSize * 1.1f);
+                        
+                        // Prevent the selection rect if we are actively dragging
+                        if (e.type == EventType.Layout)
+                        {
+                            HandleUtility.AddControl(controlID, 0f); // intercept
+                        }
+                        
+                        if ((e.type == EventType.MouseDown || e.type == EventType.MouseDrag))
+                        {
+                            if (e.button == 0) // Left click -> Place
+                            {
+                                if (existingCubeIndex == -1 && manager.colorLibrary != null && manager.sandCubePrefabs.Count > 0)
+                                {
+                                    string[] colorNames = manager.colorLibrary.GetAllColorNames();
+                                    string[] prefabNames = manager.GetPrefabNames();
+                                    
+                                    if (colorNames.Length > 0 && prefabNames.Length > 0)
+                                    {
+                                        Undo.RecordObject(manager, "Place Scene Grid Cube");
+                                        
+                                        int pIndex = Mathf.Clamp(selectedPrefabIndex, 0, prefabNames.Length - 1);
+                                        int cIndex = Mathf.Clamp(selectedColorIndex, 0, colorNames.Length - 1);
+                                        
+                                        manager.sandCubes.Add(new SandCubeManager.SandCubeData
+                                        {
+                                            prefabName = prefabNames[pIndex],
+                                            position = localPos,
+                                            rotation = newCubeRotation,
+                                            colorName = colorNames[cIndex],
+                                            sandPiecesCount = 10
+                                        });
+                                        manager.CreateOrUpdateCubes();
+                                        EditorUtility.SetDirty(manager);
+                                    }
+                                }
+                                GUIUtility.hotControl = controlID;
+                                e.Use();
+                            }
+                            else if (e.button == 1) // Right click -> Remove
+                            {
+                                if (existingCubeIndex >= 0)
+                                {
+                                    Undo.RecordObject(manager, "Remove Scene Grid Cube");
+                                    
+                                    if (manager.sandCubes[existingCubeIndex].cubeObject != null)
+                                    {
+                                        DestroyImmediate(manager.sandCubes[existingCubeIndex].cubeObject);
+                                    }
+                                    manager.sandCubes.RemoveAt(existingCubeIndex);
+                                    manager.CreateOrUpdateCubes(); // Update live scene if needed
+                                    EditorUtility.SetDirty(manager);
+                                }
+                                GUIUtility.hotControl = controlID;
+                                e.Use();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (e.type == EventType.MouseUp)
+        {
+            if (GUIUtility.hotControl == controlID)
+            {
+                GUIUtility.hotControl = 0;
+                e.Use();
+            }
+        }
+        
+        Handles.color = oldColor;
+        SceneView.RepaintAll(); // ensure hover responsiveness
+    }
     
     public override void OnInspectorGUI()
     {
@@ -136,6 +293,85 @@ public class SandCubeManagerEditor : Editor
                 
                 EditorGUILayout.EndVertical();
                 
+                // --- QUICK GRID PLACEMENT ---
+                EditorGUILayout.Space(10);
+                showGridPlacement = EditorGUILayout.Foldout(showGridPlacement, "Quick Visual Grid Placement", true, EditorStyles.foldoutHeader);
+                if (showGridPlacement)
+                {
+                    EditorGUILayout.BeginVertical("box");
+                    
+                    EditorGUILayout.BeginHorizontal();
+                    gridCols = EditorGUILayout.IntSlider("Columns (X)", gridCols, 1, 10);
+                    gridRows = EditorGUILayout.IntSlider("Rows (Y)", gridRows, 1, 10);
+                    EditorGUILayout.EndHorizontal();
+                    
+                    EditorGUILayout.BeginHorizontal();
+                    gridSpacingX = EditorGUILayout.FloatField("Spacing X", gridSpacingX);
+                    gridSpacingY = EditorGUILayout.FloatField("Spacing Y", gridSpacingY);
+                    EditorGUILayout.EndHorizontal();
+                    
+                    gridOffset = EditorGUILayout.Vector2Field("Center Offset", gridOffset);
+                    gridUseXZ = EditorGUILayout.Toggle("Use X/Z (Top-Down)", gridUseXZ);
+                    
+                    EditorGUILayout.Space(10);
+                    GUILayout.Label("In the Scene View:", EditorStyles.boldLabel);
+                    GUILayout.Label("• Left-Click on a grid cell to PLACE a cube", EditorStyles.label);
+                    GUILayout.Label("• Right-Click on a grid cell to REMOVE a cube", EditorStyles.label);
+                    GUILayout.Label("• You can click and drag to paint multiple cubes", EditorStyles.label);
+                    
+                    // Draw visual grid only in inspector to show where they are roughly
+                    EditorGUILayout.Space(10);
+                    for (int y = gridRows - 1; y >= 0; y--)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        GUILayout.FlexibleSpace();
+                        for (int x = 0; x < gridCols; x++)
+                        {
+                            float posX = (x - (gridCols - 1) * 0.5f) * gridSpacingX + gridOffset.x;
+                            float posY = (y - (gridRows - 1) * 0.5f) * gridSpacingY + gridOffset.y;
+                            
+                            Vector3 targetPos = gridUseXZ 
+                                ? new Vector3(posX, 0, posY) 
+                                : new Vector3(posX, posY, 0);
+                            
+                            // Check if cube exists roughly here
+                            bool cubeExists = false;
+                            foreach (var c in manager.sandCubes)
+                            {
+                                if (Vector3.Distance(c.position, targetPos) < 0.1f)
+                                {
+                                    cubeExists = true;
+                                    break;
+                                }
+                            }
+                            
+                            GUI.backgroundColor = cubeExists ? Color.gray : new Color(0.8f, 0.9f, 1f);
+                            if (GUILayout.Button(cubeExists ? "■" : "+", GUILayout.Width(45), GUILayout.Height(45)))
+                            {
+                                if (!cubeExists)
+                                {
+                                    Undo.RecordObject(manager, "Place Grid Cube");
+                                    manager.sandCubes.Add(new SandCubeManager.SandCubeData
+                                    {
+                                        prefabName = prefabNames[selectedPrefabIndex],
+                                        position = targetPos,
+                                        rotation = newCubeRotation,
+                                        colorName = colorNames[selectedColorIndex],
+                                        sandPiecesCount = 10
+                                    });
+                                    manager.CreateOrUpdateCubes();
+                                    EditorUtility.SetDirty(manager);
+                                }
+                            }
+                            GUI.backgroundColor = Color.white;
+                        }
+                        GUILayout.FlexibleSpace();
+                        EditorGUILayout.EndHorizontal();
+                    }
+                    
+                    EditorGUILayout.EndVertical();
+                }
+                
                 // Existing Cubes Section
                 EditorGUILayout.Space(10);
                 EditorGUILayout.LabelField("Existing Sand Cubes", EditorStyles.boldLabel);
@@ -227,6 +463,7 @@ public class SandCubeManagerEditor : Editor
         if (EditorGUI.EndChangeCheck())
         {
             EditorUtility.SetDirty(manager);
+            SceneView.RepaintAll(); // Make sure Scene wireframe instantly updates inside Unity
         }
     }
 }
