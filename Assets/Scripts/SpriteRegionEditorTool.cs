@@ -19,6 +19,12 @@ public class SpriteRegionEditorTool : MonoBehaviour
     public float colorTolerance = 0.1f;
     [Tooltip("Regions smaller than this amount of pixels will be ignored.")]
     public int minRegionPixels = 10;
+    
+    [Header("Color Max Restriction")]
+    [Tooltip("If true, it will strictly limit how many distinct colors from the library are used.")]
+    public bool applyColorReduction = true;
+    [Range(1, 20)]
+    public int maxColorsToUse = 6;
 
     
     [System.Serializable]
@@ -77,6 +83,11 @@ public class SpriteRegionEditorTool : MonoBehaviour
     private Texture2D sourceTexture;
     private Texture2D previewTexture;
     private Color[] sourcePixels;
+    
+    // Performance arrays to prevent garbage collection hits
+    private bool[] handledMapArray;
+    private Color[] previewPixelsArray;
+    private Queue<int> fillQueue = new Queue<int>(16384);
 
     private int width;
     private int height;
@@ -193,6 +204,12 @@ public class SpriteRegionEditorTool : MonoBehaviour
         height = sourceTexture.height;
         sourcePixels = sourceTexture.GetPixels();
 
+        List<ColorMaterialLibrary.ColorMaterial> activePalette = null;
+        if (applyColorReduction && autoDetectPictureColors && colorLibrary != null)
+        {
+            activePalette = GetDominantLibraryColors(maxColorsToUse);
+        }
+
         regions.Clear();
         // Preserve border colors if they exist
         Dictionary<string, Color> existingBorderColors = new Dictionary<string, Color>();
@@ -200,7 +217,12 @@ public class SpriteRegionEditorTool : MonoBehaviour
         borderRegions.Clear();
 
         int pixelCount = width * height;
-        bool[] handled = new bool[pixelCount];
+        if (handledMapArray == null || handledMapArray.Length != pixelCount)
+            handledMapArray = new bool[pixelCount];
+        else
+            System.Array.Clear(handledMapArray, 0, pixelCount);
+            
+        bool[] handled = handledMapArray;
 
         // One pass to detect everything
         for (int y = 0; y < height; y++)
@@ -228,8 +250,9 @@ public class SpriteRegionEditorTool : MonoBehaviour
                         FastFloodFillColor(idx, region.pixels, handled, c, false);
                         
                         region.color = c;
-                        region.colorName = GetClosestColorName(c);
+                        region.colorName = GetClosestColorName(c, activePalette);
                         
+                        // Apply chosen colors for both cubes and image preview
                         if (!string.IsNullOrEmpty(region.colorName) && colorLibrary != null)
                         {
                             region.color = colorLibrary.GetColorByName(region.colorName);
@@ -303,6 +326,7 @@ public class SpriteRegionEditorTool : MonoBehaviour
             for (int i = 0; i < regions.Count && i < fairColors.Count; i++)
             {
                 regions[i].colorName = fairColors[i];
+                // Apply chosen colors for both cubes and image preview
                 regions[i].color = colorLibrary.GetColorByName(fairColors[i]);
             }
         }
@@ -313,26 +337,25 @@ public class SpriteRegionEditorTool : MonoBehaviour
 
     private void FastFloodFill(int startIdx, List<Vector2Int> pixelList, bool[] handledMap, bool targetWhite)
     {
-        Queue<int> queue = new Queue<int>(1024);
-        queue.Enqueue(startIdx);
+        fillQueue.Clear();
+        fillQueue.Enqueue(startIdx);
         handledMap[startIdx] = true;
 
-        while (queue.Count > 0)
+        while (fillQueue.Count > 0)
         {
-            int idx = queue.Dequeue();
+            int idx = fillQueue.Dequeue();
             int px = idx % width;
             int py = idx / width;
             pixelList.Add(new Vector2Int(px, py));
 
-            // Neighbors
-            CheckFastNeighbor(px + 1, py, queue, handledMap, targetWhite);
-            CheckFastNeighbor(px - 1, py, queue, handledMap, targetWhite);
-            CheckFastNeighbor(px, py + 1, queue, handledMap, targetWhite);
-            CheckFastNeighbor(px, py - 1, queue, handledMap, targetWhite);
+            CheckFastNeighbor(px + 1, py, handledMap, targetWhite);
+            CheckFastNeighbor(px - 1, py, handledMap, targetWhite);
+            CheckFastNeighbor(px, py + 1, handledMap, targetWhite);
+            CheckFastNeighbor(px, py - 1, handledMap, targetWhite);
         }
     }
 
-    private void CheckFastNeighbor(int x, int y, Queue<int> queue, bool[] handledMap, bool targetWhite)
+    private void CheckFastNeighbor(int x, int y, bool[] handledMap, bool targetWhite)
     {
         if (x >= 0 && x < width && y >= 0 && y < height)
         {
@@ -345,7 +368,7 @@ public class SpriteRegionEditorTool : MonoBehaviour
                 if (isLocallyWhite == targetWhite)
                 {
                     handledMap[idx] = true;
-                    queue.Enqueue(idx);
+                    fillQueue.Enqueue(idx);
                 }
             }
         }
@@ -353,25 +376,29 @@ public class SpriteRegionEditorTool : MonoBehaviour
 
     private void FastFloodFillColor(int startIdx, List<Vector2Int> pixelList, bool[] handledMap, Color targetColor, bool isBorderMode)
     {
-        Queue<int> queue = new Queue<int>(1024);
-        queue.Enqueue(startIdx);
+        fillQueue.Clear();
+        fillQueue.Enqueue(startIdx);
         handledMap[startIdx] = true;
 
-        while (queue.Count > 0)
+        float tr = targetColor.r;
+        float tg = targetColor.g;
+        float tb = targetColor.b;
+
+        while (fillQueue.Count > 0)
         {
-            int idx = queue.Dequeue();
+            int idx = fillQueue.Dequeue();
             int px = idx % width;
             int py = idx / width;
             pixelList.Add(new Vector2Int(px, py));
 
-            CheckFastNeighborColor(px + 1, py, queue, handledMap, targetColor, isBorderMode);
-            CheckFastNeighborColor(px - 1, py, queue, handledMap, targetColor, isBorderMode);
-            CheckFastNeighborColor(px, py + 1, queue, handledMap, targetColor, isBorderMode);
-            CheckFastNeighborColor(px, py - 1, queue, handledMap, targetColor, isBorderMode);
+            CheckFastNeighborColor(px + 1, py, handledMap, tr, tg, tb, isBorderMode);
+            CheckFastNeighborColor(px - 1, py, handledMap, tr, tg, tb, isBorderMode);
+            CheckFastNeighborColor(px, py + 1, handledMap, tr, tg, tb, isBorderMode);
+            CheckFastNeighborColor(px, py - 1, handledMap, tr, tg, tb, isBorderMode);
         }
     }
 
-    private void CheckFastNeighborColor(int x, int y, Queue<int> queue, bool[] handledMap, Color targetColor, bool isBorderMode)
+    private void CheckFastNeighborColor(int x, int y, bool[] handledMap, float tr, float tg, float tb, bool isBorderMode)
     {
         if (x >= 0 && x < width && y >= 0 && y < height)
         {
@@ -387,7 +414,7 @@ public class SpriteRegionEditorTool : MonoBehaviour
                     if (isDark)
                     {
                         handledMap[idx] = true;
-                        queue.Enqueue(idx);
+                        fillQueue.Enqueue(idx);
                     }
                 }
                 else
@@ -395,11 +422,19 @@ public class SpriteRegionEditorTool : MonoBehaviour
                     bool isDark = c.r < 0.2f && c.g < 0.2f && c.b < 0.2f;
                     if (!isDark)
                     {
-                        float dist = Mathf.Max(Mathf.Abs(c.r - targetColor.r), Mathf.Abs(c.g - targetColor.g), Mathf.Abs(c.b - targetColor.b));
+                        // Inline math logic for huge speed boost over property calls
+                        float rDiff = c.r - tr; if (rDiff < 0) rDiff = -rDiff;
+                        float gDiff = c.g - tg; if (gDiff < 0) gDiff = -gDiff;
+                        float bDiff = c.b - tb; if (bDiff < 0) bDiff = -bDiff;
+                        
+                        float dist = rDiff;
+                        if (gDiff > dist) dist = gDiff;
+                        if (bDiff > dist) dist = bDiff;
+                        
                         if (dist <= colorTolerance)
                         {
                             handledMap[idx] = true;
-                            queue.Enqueue(idx);
+                            fillQueue.Enqueue(idx);
                         }
                     }
                 }
@@ -407,15 +442,21 @@ public class SpriteRegionEditorTool : MonoBehaviour
         }
     }
 
-// Helper to find the best string match from the library
-private string GetClosestColorName(Color target)
+// Helper to find the best string match from the library, filtered for pinks
+private string GetClosestColorName(Color target, List<ColorMaterialLibrary.ColorMaterial> activePalette = null)
 {
     if (colorLibrary == null || colorLibrary.colorMaterials.Count == 0) return "";
 
-    string bestMatch = colorLibrary.colorMaterials[0].colorName;
+    List<ColorMaterialLibrary.ColorMaterial> validColors = activePalette;
+    if (validColors == null || validColors.Count == 0)
+    {
+        validColors = colorLibrary.colorMaterials;
+    }
+
+    string bestMatch = validColors[0].colorName;
     float minDistance = float.MaxValue;
 
-    foreach (var entry in colorLibrary.colorMaterials)
+    foreach (var entry in validColors)
     {
         // Calculate RGB distance
         float dist = Mathf.Sqrt(
@@ -433,13 +474,63 @@ private string GetClosestColorName(Color target)
     return bestMatch;
 }
 
-// Fair color distribution helper
+private List<ColorMaterialLibrary.ColorMaterial> GetDominantLibraryColors(int maxColors)
+{
+    if (colorLibrary == null || colorLibrary.colorMaterials.Count == 0) return new List<ColorMaterialLibrary.ColorMaterial>();
+    
+    Dictionary<ColorMaterialLibrary.ColorMaterial, int> colorVotes = new Dictionary<ColorMaterialLibrary.ColorMaterial, int>();
+    foreach (var cm in colorLibrary.colorMaterials) colorVotes[cm] = 0;
+    
+    // Sample pixels to vote for the best library colors
+    int step = Mathf.Max(1, (width * height) / 8000); 
+    for (int i = 0; i < sourcePixels.Length; i += step)
+    {
+        Color c = sourcePixels[i];
+        if (c.a < 0.1f) continue;
+        
+        // ignore borders
+        if (detectBorderRegions && c.r < 0.2f && c.g < 0.2f && c.b < 0.2f) continue;
+        
+        ColorMaterialLibrary.ColorMaterial best = null;
+        float minDist = float.MaxValue;
+        foreach (var cm in colorLibrary.colorMaterials)
+        {
+            float d = Mathf.Pow(c.r - cm.color.r, 2) + Mathf.Pow(c.g - cm.color.g, 2) + Mathf.Pow(c.b - cm.color.b, 2);
+            if (d < minDist) { minDist = d; best = cm; }
+        }
+        if (best != null) colorVotes[best]++;
+    }
+    
+    List<ColorMaterialLibrary.ColorMaterial> sorted = new List<ColorMaterialLibrary.ColorMaterial>(colorLibrary.colorMaterials);
+    sorted.Sort((a, b) => colorVotes[b].CompareTo(colorVotes[a]));
+    
+    List<ColorMaterialLibrary.ColorMaterial> result = new List<ColorMaterialLibrary.ColorMaterial>();
+    int count = Mathf.Min(maxColors, sorted.Count);
+    for (int i = 0; i < count; i++)
+    {
+        if (colorVotes[sorted[i]] > 0 || i == 0) 
+        {
+            result.Add(sorted[i]);
+        }
+    }
+    
+    return result;
+}
+
+// Fair color distribution helper, filtered by maxColorsToUse
 private List<string> GetFairColorDistribution(int regionCount)
 {
     if (colorLibrary == null || colorLibrary.colorMaterials.Count == 0) 
         return new List<string>();
+        
+    string[] allNames = colorLibrary.GetAllColorNames();
+    int colorsToPick = applyColorReduction ? Mathf.Min(maxColorsToUse, allNames.Length) : allNames.Length;
     
-    string[] availableColors = colorLibrary.GetAllColorNames();
+    // Pick first 'colorsToPick' colors
+    List<string> availableColorsList = new List<string>();
+    for (int i = 0; i < colorsToPick; i++) availableColorsList.Add(allNames[i]);
+    
+    string[] availableColors = availableColorsList.ToArray();
     List<string> distributedColors = new List<string>();
     
     // Calculate how many times each color should appear
@@ -496,13 +587,19 @@ private List<string> GetFairColorDistribution(int regionCount)
             previewTexture.hideFlags = HideFlags.HideAndDontSave;
         }
 
-        Color[] previewPixels = new Color[width * height];
-        for (int i = 0; i < previewPixels.Length; i++)
+        int pixelCount = width * height;
+        if (previewPixelsArray == null || previewPixelsArray.Length != pixelCount)
+            previewPixelsArray = new Color[pixelCount];
+            
+        Color[] previewPixels = previewPixelsArray;
+        for (int i = 0; i < pixelCount; i++)
             previewPixels[i] = Color.black;
 
         // 1. Build a map of color regions once
-        int pixelCount = width * height;
-        globalRegionMap = new int[pixelCount];
+        if (globalRegionMap == null || globalRegionMap.Length != pixelCount)
+            globalRegionMap = new int[pixelCount];
+            
+        // Reset global map fast
         for (int i = 0; i < pixelCount; i++)
         {
             globalRegionMap[i] = -1;
@@ -567,9 +664,13 @@ private List<string> GetFairColorDistribution(int regionCount)
     private void CalculateGlobalDistanceMap()
     {
         int pixelCount = width * height;
-        globalDistanceMap = new float[pixelCount];
-        globalOwnerMap = new int[pixelCount];
-        Queue<int> queue = new Queue<int>(pixelCount / 10);
+        if (globalDistanceMap == null || globalDistanceMap.Length != pixelCount)
+        {
+            globalDistanceMap = new float[pixelCount];
+            globalOwnerMap = new int[pixelCount];
+        }
+        
+        fillQueue.Clear();
 
         for (int i = 0; i < pixelCount; i++)
         {
@@ -577,7 +678,7 @@ private List<string> GetFairColorDistribution(int regionCount)
             {
                 globalDistanceMap[i] = 0;
                 globalOwnerMap[i] = globalRegionMap[i];
-                queue.Enqueue(i);
+                fillQueue.Enqueue(i);
             }
             else
             {
@@ -587,9 +688,9 @@ private List<string> GetFairColorDistribution(int regionCount)
         }
 
         // Multi-source BFS to calculate distances to nearest region
-        while (queue.Count > 0)
+        while (fillQueue.Count > 0)
         {
-            int currentIdx = queue.Dequeue();
+            int currentIdx = fillQueue.Dequeue();
             int cx = currentIdx % width;
             int cy = currentIdx / width;
             
@@ -598,14 +699,14 @@ private List<string> GetFairColorDistribution(int regionCount)
 
             if (currentDist >= 20) continue; // Limit distance for performance, borders aren't usually that thick
 
-            TryAddDistanceNeighbor(cx + 1, cy, currentDist, owner, queue);
-            TryAddDistanceNeighbor(cx - 1, cy, currentDist, owner, queue);
-            TryAddDistanceNeighbor(cx, cy + 1, currentDist, owner, queue);
-            TryAddDistanceNeighbor(cx, cy - 1, currentDist, owner, queue);
+            TryAddDistanceNeighbor(cx + 1, cy, currentDist, owner);
+            TryAddDistanceNeighbor(cx - 1, cy, currentDist, owner);
+            TryAddDistanceNeighbor(cx, cy + 1, currentDist, owner);
+            TryAddDistanceNeighbor(cx, cy - 1, currentDist, owner);
         }
     }
 
-    private void TryAddDistanceNeighbor(int x, int y, float currentDist, int owner, Queue<int> queue)
+    private void TryAddDistanceNeighbor(int x, int y, float currentDist, int owner)
     {
         if (x >= 0 && x < width && y >= 0 && y < height)
         {
@@ -614,7 +715,7 @@ private List<string> GetFairColorDistribution(int regionCount)
             {
                 globalDistanceMap[idx] = currentDist + 1;
                 globalOwnerMap[idx] = owner;
-                queue.Enqueue(idx);
+                fillQueue.Enqueue(idx);
             }
         }
     }
@@ -652,7 +753,6 @@ private List<string> GetFairColorDistribution(int regionCount)
     public void RefreshColorsFromLibrary()
     {
         if (colorLibrary == null) return;
-        
         bool changed = false;
         foreach (var region in regions)
         {
